@@ -1,0 +1,25 @@
+{
+  "name": "exercicios-upload-arquivos",
+  "version": "1.0.0",
+  "description": "![](https://i.imgur.com/xG74tOh.png)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eldergsilva/exercicios-upload-arquivos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/eldergsilva/exercicios-upload-arquivos/issues"
+  },
+  "homepage": "https://github.com/eldergsilva/exercicios-upload-arquivos#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
