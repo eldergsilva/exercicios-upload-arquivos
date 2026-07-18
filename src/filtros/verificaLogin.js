@@ -1,7 +1,7 @@
-require('dotenv').config(); 
+require('dotenv').config();
 const knex = require('../db');
 const jwt = require('jsonwebtoken');
-const senhaHash = process.env.SENHA_HASH
+const senhaHash = process.env.SENHA_HASH;
 
 const verificaLogin = async (req, res, next) => {
     const { authorization } = req.headers;
@@ -27,8 +27,8 @@ const verificaLogin = async (req, res, next) => {
 
         next();
     } catch (error) {
-        return res.status(400).json(error.message);
+        return res.status(401).json('Token inválido ou expirado');
     }
 }
 
-module.exports = verificaLogin
+module.exports = verificaLogin;

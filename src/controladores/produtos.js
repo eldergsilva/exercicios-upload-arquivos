@@ -1,4 +1,5 @@
-const knex = require('../conexao');
+const knex = require('../db');
+const { uploadImagem, excluirImagem } = require('../servicos/uploads');
 
 const listarProdutos = async (req, res) => {
     const { usuario } = req;
@@ -41,40 +42,41 @@ const obterProduto = async (req, res) => {
 
 const cadastrarProduto = async (req, res) => {
     const { usuario } = req;
-    const { nome, estoque, preco, categoria, descricao, imagem } = req.body;
+    const { nome, estoque, preco, categoria, descricao } = req.body;
 
-    if (!nome) {
-        return res.status(404).json('O campo nome é obrigatório');
-    }
-
-    if (!estoque) {
-        return res.status(404).json('O campo estoque é obrigatório');
-    }
-
-    if (!preco) {
-        return res.status(404).json('O campo preco é obrigatório');
-    }
-
-    if (!descricao) {
-        return res.status(404).json('O campo descricao é obrigatório');
-    }
+    if (!nome) return res.status(400).json('O campo nome é obrigatório');
+    if (!estoque) return res.status(400).json('O campo estoque é obrigatório');
+    if (!preco) return res.status(400).json('O campo preco é obrigatório');
+    if (!descricao) return res.status(400).json('O campo descricao é obrigatório');
 
     try {
-        const produto = await knex('produtos').insert({
+        let [produto] = await knex('produtos').insert({
             usuario_id: usuario.id,
-            nome,
-            estoque,
-            preco,
-            categoria,
-            descricao,
-            imagem
+            nome, estoque, preco, categoria, descricao
         }).returning('*');
 
         if (!produto) {
             return res.status(400).json('O produto não foi cadastrado');
         }
 
-        return res.status(200).json(produto);
+        if (req.file) {
+            const { originalname, mimetype, buffer } = req.file;
+            const imagem = await uploadImagem(
+                `produtos/${produto.id}/${originalname}`,
+                buffer,
+                mimetype
+            );
+
+            const [produtoAtualizado] = await knex('produtos')
+                .update({ imagem: imagem.path })
+                .where({ id: produto.id })
+                .returning('*');
+
+            produto = produtoAtualizado;
+            produto.urlImagem = imagem.url;
+        }
+
+        return res.status(201).json(produto);
     } catch (error) {
         return res.status(400).json(error.message);
     }
@@ -83,10 +85,10 @@ const cadastrarProduto = async (req, res) => {
 const atualizarProduto = async (req, res) => {
     const { usuario } = req;
     const { id } = req.params;
-    const { nome, estoque, preco, categoria, descricao, imagem } = req.body;
+    const { nome, estoque, preco, categoria, descricao } = req.body;
 
-    if (!nome && !estoque && !preco && !categoria && !descricao && !imagem) {
-        return res.status(404).json('Informe ao menos um campo para atualizaçao do produto');
+    if (!nome && !estoque && !preco && !categoria && !descricao) {
+        return res.status(400).json('Informe ao menos um campo para atualizaçao do produto');
     }
 
     try {
@@ -106,8 +108,7 @@ const atualizarProduto = async (req, res) => {
                 estoque,
                 preco,
                 categoria,
-                descricao,
-                imagem
+                descricao
             });
 
         if (!produto) {
@@ -134,6 +135,10 @@ const excluirProduto = async (req, res) => {
             return res.status(404).json('Produto não encontrado');
         }
 
+        if (produtoEncontrado.imagem) {
+            await excluirImagem(produtoEncontrado.imagem);
+        }
+
         const produtoExcluido = await knex('produtos').where({
             id,
             usuario_id: usuario.id
@@ -149,10 +154,86 @@ const excluirProduto = async (req, res) => {
     }
 }
 
+const atualizarImagemProduto = async (req, res) => {
+    const { usuario } = req;
+    const { id } = req.params;
+
+    if (!req.file) {
+        return res.status(400).json('Nenhuma imagem foi enviada');
+    }
+
+    const { originalname, mimetype, buffer } = req.file;
+
+    try {
+        const produtoEncontrado = await knex('produtos').where({
+            id,
+            usuario_id: usuario.id
+        }).first();
+
+        if (!produtoEncontrado) {
+            return res.status(404).json('Produto não encontrado');
+        }
+
+        if (produtoEncontrado.imagem) {
+            await excluirImagem(produtoEncontrado.imagem);
+        }
+
+        const upload = await uploadImagem(
+            `produtos/${produtoEncontrado.id}/${originalname}`,
+            buffer,
+            mimetype
+        );
+
+        const [produtoAtualizado] = await knex('produtos')
+            .where({ id })
+            .update({ imagem: upload.path })
+            .returning('*');
+
+        produtoAtualizado.urlImagem = upload.url;
+
+        return res.status(200).json(produtoAtualizado);
+    } catch (error) {
+        return res.status(400).json(error.message);
+    }
+}
+
+const excluirImagemProduto = async (req, res) => {
+    const { usuario } = req;
+    const { id } = req.params;
+
+    try {
+        const produtoEncontrado = await knex('produtos').where({
+            id,
+            usuario_id: usuario.id
+        }).first();
+
+        if (!produtoEncontrado) {
+            return res.status(404).json('Produto não encontrado');
+        }
+
+        if (!produtoEncontrado.imagem) {
+            return res.status(400).json('Produto não possui imagem cadastrada');
+        }
+
+        await excluirImagem(produtoEncontrado.imagem);
+
+        const [produtoAtualizado] = await knex('produtos')
+            .where({ id })
+            .update({ imagem: null })
+            .returning('*');
+
+        return res.status(200).json(produtoAtualizado);
+    } catch (error) {
+        return res.status(400).json(error.message);
+    }
+}
+
 module.exports = {
     listarProdutos,
     obterProduto,
     cadastrarProduto,
     atualizarProduto,
-    excluirProduto
+    excluirProduto,
+    atualizarImagemProduto,
+    excluirImagemProduto
 }
